@@ -90,8 +90,12 @@
          *
          * @returns {string} The access token.
          */
-        get: function () {
-          return localStorage[config.localStorageName];
+        get: function() {
+          if (localStorage[config.localStorageName + '_expires']) {
+            return (new Date(localStorage['token-expires']) > new Date()) && localStorage[config.localStorageName];
+          } else {
+            return localStorage[config.localStorageName];
+          }
         },
 
         /**
@@ -99,8 +103,17 @@
          *
          * @param accessToken
          */
-        set: function (accessToken) {
-          localStorage[config.localStorageName] = accessToken;
+        set: function(params) {
+          if (typeof params === 'object') {
+            localStorage[config.localStorageName] = params.access_token
+            if (params.expires_in) {
+              var t = new Date();
+              t.setSeconds(t.getSeconds() + parseInt(params.expires_in));
+              localStorage.setItem(config.localStorageName + '_expires', t.toISOString());
+            }
+          } else if (typeof params === 'string') {
+            localStorage[config.localStorageName] = params;
+          }
         },
 
         /**
