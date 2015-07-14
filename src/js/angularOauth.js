@@ -3,259 +3,256 @@
 
   angular.module('angularOauth', [])
 
-  .provider('Token', function () {
+    .provider('Token', function () {
 
-    /**
-		 * Given an flat object, returns a query string for use in URLs.  Note
-		 * that for a given object, the return value may be.
-		 *
-		 * @example
-		 * <pre>
-			 // returns 'color=red&size=large'
-			 objectToQueryString({color: 'red', size: 'large'})
-		 * </pre>
-		 *
-		 * @param {Object} obj A flat object containing keys for such a string.
-		 * @returns {string} A string suitable as a query string.
-		 */
-    var objectToQueryString = function (obj) {
-      var str = [];
-      angular.forEach(obj, function (value, key) {
-        str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
-      });
-      return str.join("&");
-    };
+      /**
+       * Given an flat object, returns a query string for use in URLs.  Note
+       * that for a given object, the return value may be.
+       *
+       * @example
+       * <pre>
+       // returns 'color=red&size=large'
+       objectToQueryString({color: 'red', size: 'large'})
+       * </pre>
+       *
+       * @param {Object} obj A flat object containing keys for such a string.
+       * @returns {string} A string suitable as a query string.
+       */
+      var objectToQueryString = function (obj) {
+        var str = [];
+        angular.forEach(obj, function (value, key) {
+          str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+        });
+        return str.join("&");
+      };
 
-    // This response_type MUST be passed to the authorization endpoint using
-    // the implicit grant flow (4.2.1 of RFC 6749).
-    var RESPONSE_TYPE = 'token';
+      // This response_type MUST be passed to the authorization endpoint using
+      // the implicit grant flow (4.2.1 of RFC 6749).
+      var RESPONSE_TYPE = 'token';
 
-    // Create a special object for config fields that are required and missing.
-    // If any config items still contain it when Token is used, raise an error.
-    var REQUIRED_AND_MISSING = {};
+      // Create a special object for config fields that are required and missing.
+      // If any config items still contain it when Token is used, raise an error.
+      var REQUIRED_AND_MISSING = {};
 
-    var config = {
-      clientId: REQUIRED_AND_MISSING,
-      redirectUri: REQUIRED_AND_MISSING,
-      authorizationEndpoint: REQUIRED_AND_MISSING,
-      localStorageName: 'accessToken',
-      verifyFunc: REQUIRED_AND_MISSING,
-      scopes: []
-    };
+      var config = {
+        clientId: REQUIRED_AND_MISSING,
+        redirectUri: REQUIRED_AND_MISSING,
+        authorizationEndpoint: REQUIRED_AND_MISSING,
+        localStorageName: 'accessToken',
+        verifyFunc: REQUIRED_AND_MISSING,
+        scopes: []
+      };
 
-    this.extendConfig = function (configExtension) {
-      config = angular.extend(config, configExtension);
-    };
+      this.extendConfig = function (configExtension) {
+        config = angular.extend(config, configExtension);
+      };
 
-    this.$get = function ($q, $http, $window, $rootScope) {
-      var requiredAndMissing = [];
-      angular.forEach(config, function (value, key) {
-        if (value === REQUIRED_AND_MISSING) {
-          requiredAndMissing.push(key);
+      this.$get = function ($q, $http, $window, $rootScope) {
+        var requiredAndMissing = [];
+        angular.forEach(config, function (value, key) {
+          if (value === REQUIRED_AND_MISSING) {
+            requiredAndMissing.push(key);
+          }
+        });
+
+        if (requiredAndMissing.length) {
+          throw new Error("TokenProvider is insufficiently configured.  Please " +
+            "configure the following options using " +
+            "TokenProvider.extendConfig: " + requiredAndMissing.join(", "));
         }
-      });
 
-      if (requiredAndMissing.length) {
-        throw new Error("TokenProvider is insufficiently configured.  Please " +
-          "configure the following options using " +
-          "TokenProvider.extendConfig: " + requiredAndMissing.join(", "));
-      }
+        if (!config.clientId) {
+          throw new Error("clientId needs to be configured using TokenProvider.");
+        }
 
-      if (!config.clientId) {
-        throw new Error("clientId needs to be configured using TokenProvider.");
-      }
+        var getParams = function () {
+          // TODO: Facebook uses comma-delimited scopes. This is not compliant with section 3.3 but perhaps support later.
 
-      var getParams = function () {
-        // TODO: Facebook uses comma-delimited scopes. This is not compliant with section 3.3 but perhaps support later.
+          return {
+            response_type: config.responseType || RESPONSE_TYPE,
+            client_id: config.clientId,
+            redirect_uri: config.redirectUri,
+            scope: config.scopes.join(" ")
+          };
+        };
+
+        var buildAuthorizationUrl = function (extraParams) {
+          var params = angular.extend(getParams(), extraParams);
+          return config.authorizationEndpoint + '?' + objectToQueryString(params);
+        };
 
         return {
-          response_type: config.responseType || RESPONSE_TYPE,
-          client_id: config.clientId,
-          redirect_uri: config.redirectUri,
-          scope: config.scopes.join(" ")
-        };
-      };
+          // TODO: get/set might want to support expiration to reauthenticate
+          // TODO: check for localStorage support and otherwise perhaps use other methods of storing data (e.g. cookie)
 
-      var buildAuthorizationUrl = function (extraParams) {
-        var params = angular.extend(getParams(), extraParams);
-        return config.authorizationEndpoint + '?' + objectToQueryString(params);
-      };
-
-      return {
-        // TODO: get/set might want to support expiration to reauthenticate
-        // TODO: check for localStorage support and otherwise perhaps use other methods of storing data (e.g. cookie)
-
-        /**
-         * Returns the stored access token.
-         *
-         * @returns {string} The access token.
-         */
-        get: function() {
-          if (localStorage[config.localStorageName + '_expires']) {
-            return (new Date(localStorage['token-expires']) > new Date()) && localStorage[config.localStorageName];
-          } else {
+          /**
+           * Returns the stored access token.
+           *
+           * @returns {string} The access token.
+           */
+          get: function () {
             return localStorage[config.localStorageName];
-          }
-        },
+          },
 
-        /**
-         * Persist the access token so that it can be retrieved later by.
-         *
-         * @param accessToken
-         */
-        set: function(params) {
-          if (typeof params === 'object') {
-            localStorage[config.localStorageName] = params.access_token
-            if (params.expires_in) {
-              var t = new Date();
-              t.setSeconds(t.getSeconds() + parseInt(params.expires_in));
-              localStorage.setItem(config.localStorageName + '_expires', t.toISOString());
-            }
-          } else if (typeof params === 'string') {
-            localStorage[config.localStorageName] = params;
-          }
-        },
+          /**
+           * Persist the access token so that it can be retrieved later by.
+           *
+           * @param accessToken
+           */
+          set: function (accessToken) {
+            localStorage[config.localStorageName] = accessToken;
+          },
 
-        /**
-         * Forgets the access token.
-         */
-        clear: function () {
-          localStorage.removeItem(config.localStorageName);
-        },
+          /**
+           * Forgets the access token.
+           */
+          clear: function () {
+            localStorage.removeItem(config.localStorageName);
+          },
 
-        /**
-         * Verifies that the access token is was issued for the use of the current client.
-         *
-         * @param accessToken An access token received from the authorization server.
-         * @returns {Promise} Promise that will be resolved when the authorization server has verified that the
-         *  token is valid, and we've verified that the token is passed back has audience that matches our client
-         *  ID (to prevent the Confused Deputy Problem).
-         *
-         *  If there's an error verifying the token, the promise is rejected with an object identifying the `name` error
-         *  in the name member.  The `name` can be either:
-         *
-         *    - `invalid_audience`: The audience didn't match our client ID.
-         *    - `error_response`: The server responded with an error, typically because the token was invalid.  In this
-         *      case, the callback parameters to `error` callback on `$http` are available in the object (`data`,
-         *      `status`, `headers`, `config`).
-         */
-        verifyAsync: function (accessToken) {
-          return config.verifyFunc(config, accessToken);
-        },
+          /**
+           * Verifies that the access token is was issued for the use of the current client.
+           *
+           * @param accessToken An access token received from the authorization server.
+           * @returns {Promise} Promise that will be resolved when the authorization server has verified that the
+           *  token is valid, and we've verified that the token is passed back has audience that matches our client
+           *  ID (to prevent the Confused Deputy Problem).
+           *
+           *  If there's an error verifying the token, the promise is rejected with an object identifying the `name` error
+           *  in the name member.  The `name` can be either:
+           *
+           *    - `invalid_audience`: The audience didn't match our client ID.
+           *    - `error_response`: The server responded with an error, typically because the token was invalid.  In this
+           *      case, the callback parameters to `error` callback on `$http` are available in the object (`data`,
+           *      `status`, `headers`, `config`).
+           */
+          verifyAsync: function (accessToken) {
+            return config.verifyFunc(config, accessToken);
+          },
 
-        /**
-         * Verifies an access token asynchronously.
-         *
-         * @param extraParams Additional params to be appended to the query string of the request.
-         * @param popupOptions Settings for the display of the popup.
-         * @returns {Promise} Promise that will be resolved when the authorization server has verified that the
-         *  token is valid, and we've verified that the token is passed back has audience that matches our client
-         *  ID (to prevent the Confused Deputy Problem).
-         *
-         *  If there's an error verifying the token, the promise is rejected with an object identifying the `name` error
-         *  in the name member.  The `name` can be either:
-         *
-         *    - `invalid_audience`: The audience didn't match our client ID.
-         *    - `error_response`: The server responded with an error, typically because the token was invalid.  In this
-         *      case, the callback parameters to `error` callback on `$http` are available in the object (`data`,
-         *      `status`, `headers`, `config`).
-         */
-        getTokenByPopup: function (extraParams, popupOptions) {
-          popupOptions = angular.extend({
-            name: 'AuthPopup',
-            openParams: {
-              width: 650,
-              height: 300,
-              resizable: true,
-              scrollbars: true,
-              status: true
-            }
-          }, popupOptions);
-
-          var deferred = $q.defer();
-          var url = buildAuthorizationUrl(extraParams);
-          //var resolved = false; // Unused?
-
-          var formatPopupOptions = function (options) {
-            var pairs = [];
-            angular.forEach(options, function (value, key) {
-              if (value || value === 0) {
-                value = value === true ? 'yes' : value;
-                pairs.push(key + '=' + value);
+          /**
+           * Verifies an access token asynchronously.
+           *
+           * @param extraParams Additional params to be appended to the query string of the request.
+           * @param popupOptions Settings for the display of the popup.
+           * @returns {Promise} Promise that will be resolved when the authorization server has verified that the
+           *  token is valid, and we've verified that the token is passed back has audience that matches our client
+           *  ID (to prevent the Confused Deputy Problem).
+           *
+           *  If there's an error verifying the token, the promise is rejected with an object identifying the `name` error
+           *  in the name member.  The `name` can be either:
+           *
+           *    - `invalid_audience`: The audience didn't match our client ID.
+           *    - `error_response`: The server responded with an error, typically because the token was invalid.  In this
+           *      case, the callback parameters to `error` callback on `$http` are available in the object (`data`,
+           *      `status`, `headers`, `config`).
+           */
+          getTokenByPopup: function (extraParams, popupOptions) {
+            popupOptions = angular.extend({
+              name: 'AuthPopup',
+              openParams: {
+                width: 650,
+                height: 300,
+                resizable: true,
+                scrollbars: true,
+                status: true
               }
-            });
-            return pairs.join(',');
-          };
+            }, popupOptions);
 
-          var popup = window.open(url, popupOptions.name, formatPopupOptions(popupOptions.openParams));
+            var deferred = $q.defer();
+            var url = buildAuthorizationUrl(extraParams);
+            //var resolved = false; // Unused?
 
-          // TODO: binding occurs for each reauthentication, leading to leaks for long-running apps.
-
-          angular.element($window).bind('message', function (event) {
-            // Use JQuery originalEvent if present
-            event = event.originalEvent || event;
-            if (event.source === popup && event.origin === window.location.origin) {
-              $rootScope.$apply(function () {
-                if (event.data.access_token) {
-                  deferred.resolve(event.data);
-                } else {
-                  deferred.reject(event.data);
+            var formatPopupOptions = function (options) {
+              var pairs = [];
+              angular.forEach(options, function (value, key) {
+                if (value || value === 0) {
+                  value = value === true ? 'yes' : value;
+                  pairs.push(key + '=' + value);
                 }
               });
-            }
-          });
+              return pairs.join(',');
+            };
 
-          // TODO: reject deferred if the popup was closed without a message being delivered + maybe offer a timeout
+            var popup = window.open(url, popupOptions.name, formatPopupOptions(popupOptions.openParams));
 
-          return deferred.promise;
-        },
+            // TODO: binding occurs for each reauthentication, leading to leaks for long-running apps.
 
-        getTokenInSameWindow: function (extraParams) {
-          var url = buildAuthorizationUrl(extraParams);
-          $window.location.href = url;
-        }
+            angular.element($window).bind('message', function (event) {
+              // Use JQuery originalEvent if present
+              event = event.originalEvent || event;
+              if (event.source === popup && event.origin === window.location.origin) {
+                $rootScope.$apply(function () {
+                  if (event.data.access_token) {
+                    deferred.resolve(event.data);
+                  } else {
+                    deferred.reject(event.data);
+                  }
+                });
+              }
+            });
+
+            // TODO: reject deferred if the popup was closed without a message being delivered + maybe offer a timeout
+
+            return deferred.promise;
+          },
+
+          getTokenInSameWindow: function (extraParams) {
+            var url = buildAuthorizationUrl(extraParams);
+            $window.location.href = url;
+          }
+        };
       };
-    };
-  })
+    })
 
   /**
    * A controller for the redirect endpoint that inspects the URL redirected to by the authorization server and sends
    * it back to other windows using.
    */
-  .controller('CallbackCtrl', function ($scope, $location) {
+    .controller('CallbackCtrl', function ($scope, $location) {
 
-    /**
-     * Parses an escaped url query string into key-value pairs.
-     *
-     * (Copied from Angular.js in the AngularJS project.)
-     *
-     * @returns Object.<(string|boolean)>
-     */
-    function parseKeyValue( /**string*/ keyValue) {
-      var obj = {};
-      var key_value, key;
+      /**
+       * Parses an escaped url query string into key-value pairs.
+       *
+       * (Copied from Angular.js in the AngularJS project.)
+       *
+       * @returns Object.<(string|boolean)>
+       */
+      function parseKeyValue( /**string*/ keyValue) {
+        var obj = {};
+        var key_value, key;
 
-      angular.forEach((keyValue || "").split('&'), function (keyValue) {
-        if (keyValue) {
-          key_value = keyValue.split('=');
-          key = decodeURIComponent(key_value[0]);
-          obj[key] = angular.isDefined(key_value[1]) ? decodeURIComponent(key_value[1]) : true;
-        }
-      });
+        angular.forEach((keyValue || "").split('&'), function (keyValue) {
+          if (keyValue) {
+            key_value = keyValue.split('=');
+            key = decodeURIComponent(key_value[0]);
+            obj[key] = angular.isDefined(key_value[1]) ? decodeURIComponent(key_value[1]) : true;
 
-      return obj;
-    }
+          }
+        });
 
-    var queryString = $location.path().substring(1); // preceding slash omitted
+        return obj;
+      }
 
-    var params = parseKeyValue(queryString);
+      var queryString = $location.path().substring(1); // preceding slash omitted
 
-    // TODO: The target origin should be set to an explicit origin.  Otherwise, a malicious site that can receive
-    //       the token if it manages to change the location of the parent. (See:
-    //       https://developer.mozilla.org/en/docs/DOM/window.postMessage#Security_concerns)
+      var params = parseKeyValue(queryString);
+      console.log(params);
 
-    window.opener.postMessage(params, "*");
-    window.close();
-  });
+      // TODO: The target origin should be set to an explicit origin.  Otherwise, a malicious site that can receive
+      //       the token if it manages to change the location of the parent. (See:
+      //       https://developer.mozilla.org/en/docs/DOM/window.postMessage#Security_concerns)
+
+      if (window.opener) {
+        window.opener.postMessage(params, "*");
+        window.close();
+      } else {
+        var query = $location.search();
+        console.log('query', query, 'location', location.search.split('=')[1] );
+        localStorage.accessToken = location.search.split('=')[1];
+        window.location.href = '/';
+      }
+
+    });
 
 })(window, document);
