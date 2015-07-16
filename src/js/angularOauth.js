@@ -247,10 +247,11 @@
         window.opener.postMessage(params, "*");
         window.close();
       } else {
-        var query = $location.search();
-        console.log('query', query, 'location', location.search.split('=')[1] );
-        localStorage.accessToken = location.search.split('=')[1];
-        window.location.href = '/';
+        var accessToken = location.search.split('=')[1];
+        if (accessToken) {
+          localStorage.accessToken = location.search.split('=')[1];
+          window.location.href = '/';
+        }
       }
 
     });
