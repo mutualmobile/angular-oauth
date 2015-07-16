@@ -237,6 +237,7 @@
       var queryString = $location.path().replace(/[^\/]*\//, ''); // preceding slash omitted
       var params = parseKeyValue(queryString);
 
+      console.log('queryString', queryString);
 
       // TODO: The target origin should be set to an explicit origin.  Otherwise, a malicious site that can receive
       //       the token if it manages to change the location of the parent. (See:
@@ -246,6 +247,8 @@
         window.opener.postMessage(params, "*");
         window.close();
       } else {
+        console.log('params', params);
+        return;
         if (params.access_token) {
           localStorage.accessToken = params.access_token;
           localStorage.tokenExpires = params.expires_in;
