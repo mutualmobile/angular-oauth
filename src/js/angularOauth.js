@@ -248,7 +248,6 @@
         window.close();
       } else {
         console.log('params', params);
-        return;
         if (params.access_token) {
           localStorage.accessToken = params.access_token;
           localStorage.tokenExpires = params.expires_in;
