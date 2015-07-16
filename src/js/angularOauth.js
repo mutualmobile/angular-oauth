@@ -234,10 +234,9 @@
         return obj;
       }
 
-      var queryString = $location.path().substring(1); // preceding slash omitted
-
+      var queryString = $location.path().replace(/[^\/]*\//, ''); // preceding slash omitted
       var params = parseKeyValue(queryString);
-      console.log(params);
+
 
       // TODO: The target origin should be set to an explicit origin.  Otherwise, a malicious site that can receive
       //       the token if it manages to change the location of the parent. (See:
@@ -247,9 +246,9 @@
         window.opener.postMessage(params, "*");
         window.close();
       } else {
-        var accessToken = location.search.split('=')[1];
-        if (accessToken) {
-          localStorage.accessToken = location.search.split('=')[1];
+        if (params.access_token) {
+          localStorage.accessToken = params.access_token;
+          localStorage.tokenExpires = params.expires_in;
           window.location.href = '/';
         }
       }
