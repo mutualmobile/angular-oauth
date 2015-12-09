@@ -72,7 +72,7 @@
             response_type: config.responseType || RESPONSE_TYPE,
             client_id: config.clientId,
             redirect_uri: config.redirectUri,
-            scope: config.scopes.join(" ")
+            scope: config.scopes.join(",")
           };
         };
 
@@ -237,23 +237,14 @@
       var queryString = $location.path().replace(/[^\/]*\//, ''); // preceding slash omitted
       var params = parseKeyValue(queryString);
 
-      console.log('queryString', queryString);
 
-      // TODO: The target origin should be set to an explicit origin.  Otherwise, a malicious site that can receive
-      //       the token if it manages to change the location of the parent. (See:
-      //       https://developer.mozilla.org/en/docs/DOM/window.postMessage#Security_concerns)
-
-      if (window.opener) {
-        window.opener.postMessage(params, "*");
-        window.close();
-      } else {
-        console.log('params', params);
-        if (params.access_token) {
-          localStorage.accessToken = params.access_token;
-          localStorage.tokenExpires = params.expires_in;
-          window.location.href = '/';
-        }
+      console.log('params', params);
+      if (params.access_token) {
+        localStorage.accessToken = params.access_token;
+        localStorage.tokenExpires = params.expires_in;
+        window.location.href = '/';
       }
+
 
     });
 
