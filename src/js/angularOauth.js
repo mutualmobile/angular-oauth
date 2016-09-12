@@ -237,15 +237,11 @@
       var queryString = $location.path().replace(/[^\/]*\//, ''); // preceding slash omitted
       var params = parseKeyValue(queryString);
 
-
-      console.log('params', params);
       if (params.access_token) {
         localStorage.accessToken = params.access_token;
         localStorage.tokenExpires = params.expires_in;
         window.location.href = '/';
       }
-
-
     });
 
 })(window, document);
